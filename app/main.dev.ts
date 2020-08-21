@@ -15,6 +15,7 @@ import { app, BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
+import readFilePath from './node/fileTree';
 
 export default class AppUpdater {
   constructor() {
@@ -49,6 +50,7 @@ const installExtensions = async () => {
 };
 
 const createWindow = async () => {
+  const filePathReader = readFilePath();
   if (
     process.env.NODE_ENV === 'development' ||
     process.env.DEBUG_PROD === 'true'
@@ -90,6 +92,17 @@ const createWindow = async () => {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    filePathReader
+      .then((filePath) => {
+        mainWindow?.webContents.send('ping', JSON.stringify(filePath));
+        return filePath;
+      })
+      .catch((err) => {
+        mainWindow?.webContents.send('ping', 'error');
+      });
   });
 
   const menuBuilder = new MenuBuilder(mainWindow);
