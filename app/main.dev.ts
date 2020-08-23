@@ -11,11 +11,15 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 import path from 'path';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
-import readFilePath from './node/fileTree';
+import electronStore from './electronStore';
+import getFileTree from './node/fileTree';
+
+const fileTree = getFileTree();
+electronStore.set('fileTree', fileTree);
 
 export default class AppUpdater {
   constructor() {
@@ -32,10 +36,7 @@ if (process.env.NODE_ENV === 'production') {
   sourceMapSupport.install();
 }
 
-if (
-  process.env.NODE_ENV === 'development' ||
-  process.env.DEBUG_PROD === 'true'
-) {
+if (process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true') {
   require('electron-debug')();
 }
 
@@ -45,33 +46,27 @@ const installExtensions = async () => {
   const extensions = ['REACT_DEVELOPER_TOOLS', 'REDUX_DEVTOOLS'];
 
   return Promise.all(
-    extensions.map((name) => installer.default(installer[name], forceDownload))
+    extensions.map(name => installer.default(installer[name], forceDownload))
   ).catch(console.log);
 };
 
 const createWindow = async () => {
-  const filePathReader = readFilePath();
-  if (
-    process.env.NODE_ENV === 'development' ||
-    process.env.DEBUG_PROD === 'true'
-  ) {
+  if (process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true') {
     await installExtensions();
   }
-
   mainWindow = new BrowserWindow({
     show: false,
     width: 1024,
     height: 728,
     webPreferences:
-      (process.env.NODE_ENV === 'development' ||
-        process.env.E2E_BUILD === 'true') &&
+      (process.env.NODE_ENV === 'development' || process.env.E2E_BUILD === 'true') &&
       process.env.ERB_SECURE !== 'true'
         ? {
-            nodeIntegration: true,
+            nodeIntegration: true
           }
         : {
-            preload: path.join(__dirname, 'dist/renderer.prod.js'),
-          },
+            preload: path.join(__dirname, 'dist/renderer.prod.js')
+          }
   });
 
   mainWindow.loadURL(`file://${__dirname}/app.html`);
@@ -94,19 +89,19 @@ const createWindow = async () => {
     mainWindow = null;
   });
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    filePathReader
-      .then((filePath) => {
-        mainWindow?.webContents.send('ping', JSON.stringify(filePath));
-        return filePath;
-      })
-      .catch((err) => {
-        mainWindow?.webContents.send('ping', 'error');
-      });
-  });
-
   const menuBuilder = new MenuBuilder(mainWindow);
   menuBuilder.buildMenu();
+
+  ipcMain.on('editor-message', (_e, arg: { code: string; data: any }) => {
+    const { code, data } = arg;
+    switch (code) {
+      case 'fileTree':
+        mainWindow?.webContents.send('fileTree', electronStore.get('fileTree'));
+        break;
+      default:
+        break;
+    }
+  });
 
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
@@ -129,7 +124,9 @@ if (process.env.E2E_BUILD === 'true') {
   // eslint-disable-next-line promise/catch-or-return
   app.whenReady().then(createWindow);
 } else {
-  app.on('ready', createWindow);
+  app.on('ready', () => {
+    createWindow();
+  });
 }
 
 app.on('activate', () => {

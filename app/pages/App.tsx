@@ -1,15 +1,21 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
+import { useDispatch } from 'react-redux';
+import { updateTree } from '../reducer/tree';
 
 type Props = {
   children: ReactNode;
 };
 
-require('electron').ipcRenderer.on('ping', function (event, message) {
-  console.log(message, 11111111111); // Prints "whoooooooh!"
-});
-
 export default function App(props: Props) {
   const { children } = props;
+  const dispatch = useDispatch();
+  useEffect(() => {
+    ipcRenderer.send('editor-message', { code: 'fileTree' });
+    ipcRenderer.on('fileTree', (event, data) => {
+      console.log(data, 11111111111); // Prints "whoooooooh!"
+      dispatch(updateTree(data));
+    });
+  }, []);
   return <>{children}</>;
 }

@@ -3,13 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import styles from './Counter.css';
 import routes from '../../constants/routes.json';
-import {
-  increment,
-  decrement,
-  incrementIfOdd,
-  incrementAsync,
-  selectCount,
-} from './counterSlice';
+import { increment, decrement, incrementIfOdd, incrementAsync, selectCount } from './counterSlice';
 
 export default function Counter() {
   const dispatch = useDispatch();
